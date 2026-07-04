@@ -9,10 +9,10 @@ env/
 *.log
 *.pid
 
-outputs/
-checkpoints/
-data/
-models/
+/outputs/
+/checkpoints/
+/data/
+/models/
 
 .cache/
 .pytest_cache/
