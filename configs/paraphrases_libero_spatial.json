@@ -1,0 +1,33 @@
+{
+  "suite": "libero_spatial",
+  "episodes_per_paraphrase": 5,
+  "items": [
+    {
+      "task_id": 0,
+      "original_hint": "Put the black bowl on the plate.",
+      "paraphrases": [
+        "Place the black bowl onto the plate.",
+        "Move the black bowl so that it rests on the plate.",
+        "Pick up the black bowl and set it down on the plate."
+      ]
+    },
+    {
+      "task_id": 1,
+      "original_hint": "Put the object in the target container.",
+      "paraphrases": [
+        "Place the object inside the target container.",
+        "Move the object into the specified container.",
+        "Pick up the object and drop it into the target container."
+      ]
+    },
+    {
+      "task_id": 2,
+      "original_hint": "Move the object to the requested spatial location.",
+      "paraphrases": [
+        "Place the object at the requested position.",
+        "Move the object to the specified spatial target.",
+        "Pick up the object and set it down at the target location."
+      ]
+    }
+  ]
+}
