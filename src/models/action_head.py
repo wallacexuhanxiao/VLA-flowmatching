@@ -7,21 +7,22 @@ from torch import nn
 
 
 class SinusoidalTimeEmbedding(nn.Module):
-    def __init__(self, dim: int) -> None:
+    def __init__(self, dim: int, min_period: float = 4e-3, max_period: float = 4.0) -> None:
         super().__init__()
+        if dim % 2 != 0:
+            raise ValueError("Time embedding dimension must be even.")
         self.dim = dim
+        self.min_period = min_period
+        self.max_period = max_period
 
     def forward(self, t: torch.Tensor) -> torch.Tensor:
+        t_float = t.float()
         half = self.dim // 2
-        freqs = torch.exp(
-            torch.arange(half, device=t.device, dtype=t.dtype)
-            * -(math.log(10000.0) / max(half - 1, 1))
-        )
-        args = t[:, None] * freqs[None]
-        emb = torch.cat([args.sin(), args.cos()], dim=-1)
-        if emb.shape[-1] < self.dim:
-            emb = torch.nn.functional.pad(emb, (0, 1))
-        return emb
+        fraction = torch.linspace(0.0, 1.0, half, device=t.device, dtype=torch.float32)
+        periods = self.min_period * (self.max_period / self.min_period) ** fraction
+        angles = 2.0 * math.pi * t_float[:, None] / periods[None, :]
+        emb = torch.cat([angles.sin(), angles.cos()], dim=-1)
+        return emb.to(dtype=t.dtype)
 
 
 class FlowMatchingActionHead(nn.Module):
@@ -29,12 +30,14 @@ class FlowMatchingActionHead(nn.Module):
         self,
         action_dim: int = 7,
         hidden_dim: int = 512,
+        chunk_size: int = 50,
         num_layers: int = 4,
         num_heads: int = 8,
         dropout: float = 0.1,
     ) -> None:
         super().__init__()
         self.action_proj = nn.Linear(action_dim, hidden_dim)
+        self.action_position = nn.Parameter(torch.randn(1, chunk_size, hidden_dim) * 0.02)
         self.time_mlp = nn.Sequential(
             SinusoidalTimeEmbedding(hidden_dim),
             nn.Linear(hidden_dim, hidden_dim),
@@ -59,8 +62,14 @@ class FlowMatchingActionHead(nn.Module):
         condition: torch.Tensor,
         condition_mask: torch.Tensor | None = None,
     ) -> torch.Tensor:
-        action_tokens = self.action_proj(noisy_actions)
-        action_tokens = action_tokens + self.time_mlp(time).unsqueeze(1)
+        horizon = noisy_actions.shape[1]
+        if horizon > self.action_position.shape[1]:
+            raise ValueError(f"horizon={horizon} exceeds learned chunk size={self.action_position.shape[1]}")
+        action_tokens = (
+            self.action_proj(noisy_actions)
+            + self.action_position[:, :horizon]
+            + self.time_mlp(time).unsqueeze(1)
+        )
         hidden = self.decoder(
             tgt=action_tokens,
             memory=condition,

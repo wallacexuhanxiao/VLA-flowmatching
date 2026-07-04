@@ -41,6 +41,8 @@ eval_every: 1000
 save_every: 1000
 keep_last: 3
 max_val_batches: 64
+val_frames_per_task: 20
+eval_seed: 12345
 
 ode_steps: 10
 sampler: euler

@@ -59,24 +59,55 @@ class SmolVLMFeatureExtractor(nn.Module):
         raise AttributeError("Could not infer VLM hidden size from config.")
 
     def _prompts(self, texts: list[str]) -> list[str]:
-        prompts = []
-        for text in texts:
-            prompts.append(
-                "<image><image>\n"
-                "You are observing a robot manipulation scene from the main camera and wrist camera.\n"
-                f"Instruction: {text}\n"
-                "Return compact visual-language features for control."
-            )
-        return prompts
+        if hasattr(self.processor, "apply_chat_template"):
+            prompts = []
+            for text in texts:
+                messages = [
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "image"},
+                            {"type": "image"},
+                            {
+                                "type": "text",
+                                "text": (
+                                    "You are observing a robot manipulation scene from the main camera "
+                                    "and wrist camera.\n"
+                                    f"Instruction: {text}\n"
+                                    "Return compact visual-language features for control."
+                                ),
+                            },
+                        ],
+                    }
+                ]
+                prompts.append(self.processor.apply_chat_template(messages, add_generation_prompt=False, tokenize=False))
+            return prompts
+        return [
+            "<image><image>\n"
+            "You are observing a robot manipulation scene from the main camera and wrist camera.\n"
+            f"Instruction: {text}\n"
+            "Return compact visual-language features for control."
+            for text in texts
+        ]
 
     def _processor_call(self, main_images: list[Image.Image], wrist_images: list[Image.Image], texts: list[str]) -> dict[str, Any]:
+        if not (len(main_images) == len(wrist_images) == len(texts)):
+            raise ValueError("main_images, wrist_images, and texts must have the same batch size.")
         prompts = self._prompts(texts)
         paired_images = [[m, w] for m, w in zip(main_images, wrist_images)]
-        try:
-            return self.processor(text=prompts, images=paired_images, return_tensors="pt", padding=True)
-        except Exception:
-            flat_images = [img for pair in paired_images for img in pair]
-            return self.processor(text=prompts, images=flat_images, return_tensors="pt", padding=True)
+        inputs = self.processor(text=prompts, images=paired_images, return_tensors="pt", padding=True)
+        pixel_values = inputs.get("pixel_values")
+        if torch.is_tensor(pixel_values):
+            expected = {len(texts), len(texts) * 2}
+            if pixel_values.shape[0] not in expected:
+                raise ValueError(f"Unexpected pixel_values batch={pixel_values.shape[0]}, expected one of {sorted(expected)}.")
+        return inputs
+
+    def train(self, mode: bool = True):
+        super().train(mode)
+        if self.freeze:
+            self.model.eval()
+        return self
 
     def forward(
         self,
@@ -85,6 +116,8 @@ class SmolVLMFeatureExtractor(nn.Module):
         texts: list[str],
         device: torch.device,
     ) -> tuple[torch.Tensor, torch.Tensor | None]:
+        if self.freeze:
+            self.model.eval()
         inputs = self._processor_call(main_images, wrist_images, texts)
         inputs = {k: v.to(device) if torch.is_tensor(v) else v for k, v in inputs.items()}
         context = torch.no_grad() if self.freeze else torch.enable_grad()

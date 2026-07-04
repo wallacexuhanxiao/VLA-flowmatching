@@ -35,6 +35,7 @@ class CustomVLAPolicy(nn.Module):
             self.action_head = FlowMatchingActionHead(
                 action_dim=self.action_dim,
                 hidden_dim=hidden,
+                chunk_size=self.chunk_size,
                 num_layers=int(cfg.get("head_layers", 4)),
                 num_heads=int(cfg.get("head_heads", 8)),
                 dropout=float(cfg.get("dropout", 0.1)),
@@ -71,6 +72,7 @@ class CustomVLAPolicy(nn.Module):
         device: torch.device,
         ode_steps: int = 10,
         sampler: str = "euler",
+        generator: torch.Generator | None = None,
     ) -> torch.Tensor:
         condition = self.encode_condition(batch, device)
         if self.mode == "flow":
@@ -81,6 +83,7 @@ class CustomVLAPolicy(nn.Module):
                 action_dim=self.action_dim,
                 num_steps=ode_steps,
                 method=sampler,
+                generator=generator,
             )
         return self.action_head(condition)
 
@@ -95,4 +98,4 @@ class CustomVLAPolicy(nn.Module):
     def load_trainable_state_dict(self, state: dict[str, dict[str, torch.Tensor]]) -> None:
         self.resampler.load_state_dict(state["resampler"])
         self.state_encoder.load_state_dict(state["state_encoder"])
-        self.action_head.load_state_dict(state["action_head"])
+        self.action_head.load_state_dict(state["action_head"], strict=False)
