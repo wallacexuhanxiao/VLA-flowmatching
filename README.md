@@ -61,6 +61,56 @@ bash scripts/51_train_l1_baseline.sh
 bash scripts/52_eval_custom.sh configs/flow_matching.yaml /root/autodl-tmp/outputs/vla_project/custom_flow/checkpoints/last.pt
 ```
 
+## Closed-Loop LIBERO Rollout
+
+Rollout requires the simulator stack, not just the offline dataset:
+
+- `libero`
+- `robosuite`
+- MuJoCo with EGL rendering, usually `MUJOCO_GL=egl`
+- a visible CUDA GPU for practical SmolVLM2 inference
+- trained checkpoints that include normalization statistics
+
+Check the runtime first:
+
+```bash
+source /root/vla_project/activate_vla.sh
+cd /root/vla_project
+bash scripts/60_check_libero_rollout_env.sh
+```
+
+Run the main Flow Matching policy on LIBERO-Spatial:
+
+```bash
+CHECKPOINT=/root/autodl-tmp/outputs/vla_project/custom_flow_fixed_10k/checkpoints/best.pt \
+OUT_DIR=/root/autodl-tmp/outputs/vla_project/rollouts/flow_ode10 \
+bash scripts/61_rollout_flow_spatial.sh
+```
+
+Run the L1 baseline:
+
+```bash
+CHECKPOINT=/root/autodl-tmp/outputs/vla_project/custom_l1_fixed_10k/checkpoints/best.pt \
+OUT_DIR=/root/autodl-tmp/outputs/vla_project/rollouts/l1 \
+bash scripts/62_rollout_l1_spatial.sh
+```
+
+Run the Flow Matching ODE-step sweep:
+
+```bash
+CHECKPOINT=/root/autodl-tmp/outputs/vla_project/custom_flow_fixed_10k/checkpoints/best.pt \
+OUT_ROOT=/root/autodl-tmp/outputs/vla_project/rollouts/flow_ode_sweep \
+bash scripts/63_rollout_flow_ode_sweep.sh
+```
+
+Each rollout writes:
+
+- `summary.json`: aggregate success rate, per-task success rate, average steps, average decision latency
+- `episodes.jsonl`: one row per closed-loop episode
+
+The controller uses receding horizon execution: sample a 50-step action chunk,
+execute the first 10 actions, observe again, and repeat until success or timeout.
+
 ## Main Metrics
 
 - offline Flow Matching validation loss
@@ -68,4 +118,4 @@ bash scripts/52_eval_custom.sh configs/flow_matching.yaml /root/autodl-tmp/outpu
 - action-chunk L2 error
 - predicted action smoothness
 - action chunk inference latency for 5/10/20 ODE steps
-- closed-loop LIBERO success rate once rollout integration is enabled
+- closed-loop LIBERO success rate
