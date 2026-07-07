@@ -1,0 +1,50 @@
+seed: 7
+mode: flow
+data_root: /root/autodl-tmp/datasets/HuggingFaceVLA_libero
+vlm_root: /root/autodl-tmp/models/SmolVLM2-500M-Video-Instruct
+output_dir: /root/autodl-tmp/outputs/vla_project/u_flow16
+split_dir: /root/autodl-tmp/outputs/vla_project/splits
+train_episodes: /root/autodl-tmp/outputs/vla_project/splits/libero_spatial_train_episodes.json
+val_episodes: /root/autodl-tmp/outputs/vla_project/splits/libero_spatial_val_episodes.json
+
+task_suite: libero_spatial
+main_image_key: observation.images.image
+wrist_image_key: observation.images.image2
+state_key: observation.state
+action_key: action
+task_key: task_index
+episode_key: episode_index
+
+chunk_size: 16
+action_dim: 7
+state_dim: 8
+strict_state_dim: true
+execute_horizon: 8
+image_size: 224
+condition_tokens: 16
+condition_dim: 512
+head_layers: 4
+head_heads: 8
+dropout: 0.0
+
+freeze_vlm: true
+use_bf16: true
+gradient_checkpointing: false
+
+batch_size: 2
+num_workers: 2
+max_steps: 20000
+learning_rate: 0.0002
+weight_decay: 0.0
+grad_clip: 1.0
+log_every: 20
+eval_every: 1000
+save_every: 1000
+keep_last: 3
+max_val_batches: 64
+val_frames_per_task: 20
+eval_seed: 12345
+
+ode_steps: 10
+sampler: heun
+save_videos: false
